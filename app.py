@@ -226,7 +226,7 @@ def ordenar_csv(df: pd.DataFrame) -> pd.DataFrame:
 # =========================
 # UI
 # =========================
-st.title("🧹 Ordenador de CSV")
+st.title("🧹 Reordenamiento de CSV para los hospitales")
 st.write("Sube tu **CSV**, lo normalizo y ordeno según tu regla. Descarga el resultado listo para usar.")
 
 with st.expander("Opciones de lectura"):
