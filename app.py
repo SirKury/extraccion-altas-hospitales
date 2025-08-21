@@ -10,9 +10,9 @@ st.set_page_config(page_title="Ordenador de CSV (13 columnas)", page_icon="🧹"
 
 st.sidebar.title("ℹ️ Instrucciones")
 st.sidebar.markdown("""
-1. **Descargr el reporte de SIS "Tabulador de egresos"** en formato excel
+1. **Descargar el reporte de SIS "Tabulador de egresos"** en formato excel
 2. **Abrir el archivo** Y guardarlo en formato CSV cambiando el nombre y colocando el formato del CSV en UTF-8
-3. **Subir el archivo CSV*
+3. **Subir el archivo CSV**
 4. **Descarga** el archivo procesado con el botón de descarga.
 """)
 
