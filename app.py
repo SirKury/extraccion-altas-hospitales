@@ -6,7 +6,7 @@ import re
 import io
 from datetime import datetime
 
-st.set_page_config(page_title="Ordenador de CSV (13 columnas)", page_icon="🧹", layout="wide")
+st.set_page_config(page_title="Ordenador de CSV", page_icon="🧹", layout="wide")
 
 st.sidebar.title("ℹ️ Instrucciones")
 st.sidebar.markdown("""
