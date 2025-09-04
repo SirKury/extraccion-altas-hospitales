@@ -100,6 +100,32 @@ def ordenar_csv(df: pd.DataFrame) -> pd.DataFrame:
 
     norm_cols = {normalize(c): c for c in df.columns}
 
+    def find_source_col(target_name):
+        if target_name not in synonyms:
+            return None
+        syns = [normalize(s) for s in synonyms[target_name]]
+
+        # 1) igualdad exacta normalizada
+        for syn in syns:
+            if syn in norm_cols:
+                return norm_cols[syn]
+        # 2) inclusión (laxto)
+        for syn in syns:
+            for nc, orig in norm_cols.items():
+                if syn and (syn in nc or nc in syn):
+                    return orig
+        # 3) intersección de tokens
+        best, score = None, 0
+        for nc, orig in norm_cols.items():
+            for syn in syns:
+                toks_syn = set(syn.split())
+                toks_nc = set(nc.split())
+                inter = len(toks_syn & toks_nc)
+                if inter > score:
+                    score = inter
+                    best = orig
+        return best
+
     # Nombre completo del paciente
     EXCLUDE_TOKENS = ["responsable", "medico", "médico", "telefono", "teléfono", "whatsapp"]
     name_candidates = []
