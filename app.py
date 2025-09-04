@@ -58,12 +58,13 @@ def clean_diagnosis(text: str) -> str:
 # =========================
 def ordenar_csv(df: pd.DataFrame) -> pd.DataFrame:
     TARGET_ORDER = [
-        "Nombre del paciente","Edad","Número de expediente","Número de contacto","Nombre del responsable",
-        "Contacto de responsable","Servicio","Fecha de ingreso","Diagnóstico de ingreso",
-        "Fecha de egreso","Diagnóstico de egreso","Llamada de seguimiento",
-        "Médico que realiza seguimiento","RESUMEN DE SEGUIMIENTO"
+        "Nombre del paciente", "Edad", "Número de expediente", "Número de contacto", "Nombre del responsable",
+        "Contacto de responsable", "Servicio", "Fecha de ingreso", "Diagnóstico de ingreso",
+        "Fecha de egreso", "Diagnóstico de egreso", "Llamada de seguimiento",
+        "Médico que realiza seguimiento", "RESUMEN DE SEGUIMIENTO"
     ]
 
+    # Sinónimos de las columnas
     synonyms = {
         "Edad": ["edad", "anos", "años"],
         "Número de expediente": [
@@ -105,16 +106,16 @@ def ordenar_csv(df: pd.DataFrame) -> pd.DataFrame:
             return None
         syns = [normalize(s) for s in synonyms[target_name]]
 
-        # 1) igualdad exacta normalizada
+        # 1) Igualdad exacta normalizada
         for syn in syns:
             if syn in norm_cols:
                 return norm_cols[syn]
-        # 2) inclusión (laxto)
+        # 2) Inclusión (laxto)
         for syn in syns:
             for nc, orig in norm_cols.items():
                 if syn and (syn in nc or nc in syn):
                     return orig
-        # 3) intersección de tokens
+        # 3) Intersección de tokens
         best, score = None, 0
         for nc, orig in norm_cols.items():
             for syn in syns:
@@ -125,34 +126,6 @@ def ordenar_csv(df: pd.DataFrame) -> pd.DataFrame:
                     score = inter
                     best = orig
         return best
-
-    # Nombre completo del paciente
-    EXCLUDE_TOKENS = ["responsable", "medico", "médico", "telefono", "teléfono", "whatsapp"]
-    name_candidates = []
-    for col in df.columns:
-        nc = normalize(col)
-        if any(tok in nc for tok in ["nombre", "nombres", "apellido", "apellidos", "paciente"]):
-            if not any(ex in nc for ex in EXCLUDE_TOKENS):
-                name_candidates.append(col)
-
-    priority = [
-        "primer nombre", "segundo nombre", "1er nombre", "2do nombre", "nombres", "nombre",
-        "primer apellido", "segundo apellido", "1er apellido", "2do apellido", "apellidos", "apellido",
-        "nombre del paciente", "paciente"
-    ]
-    final_name_cols = []
-    for patt in priority:
-        for nc, orig in norm_cols.items():
-            if patt in nc and orig in name_candidates and orig not in final_name_cols:
-                final_name_cols.append(orig)
-    if not final_name_cols:
-        final_name_cols = name_candidates
-
-    if final_name_cols:
-        df["Nombre del paciente"] = df.apply(lambda r: join_tokens(r, final_name_cols), axis=1)
-    else:
-        if "Nombre del paciente" not in df.columns:
-            df["Nombre del paciente"] = ""
 
     # Reglas fijas
     if "Nombre Responsable" in df.columns:
@@ -172,18 +145,16 @@ def ordenar_csv(df: pd.DataFrame) -> pd.DataFrame:
             tel_candidates.append(col)
     resp_cols = [c for c in tel_candidates if "responsable" in normalize(c)]
     pac_cols  = [c for c in tel_candidates if "paciente" in normalize(c)]
-    if resp_cols:
-        numero_contacto_series = df[resp_cols[0]]
-    elif pac_cols:
-        numero_contacto_series = df[pac_cols[0]]
-    elif tel_candidates:
-        numero_contacto_series = df[tel_candidates[0]]
+    
+    # Asignación de número de contacto (paciente y responsable)
+    if "Teléfono Paciente" in df.columns:
+        numero_contacto_series = df["Teléfono Paciente"]
     else:
         numero_contacto_series = ""
-
-    # Extraer contacto del responsable como columna separada
-    if resp_cols:
-        contacto_responsable_series = df[resp_cols[0]]
+    
+    # Asignación de contacto del responsable
+    if "Teléfono Responsable" in df.columns:
+        contacto_responsable_series = df["Teléfono Responsable"]
     else:
         contacto_responsable_series = ""
 
@@ -221,64 +192,38 @@ def ordenar_csv(df: pd.DataFrame) -> pd.DataFrame:
             else:
                 final_df[tgt] = ""
 
+    # Aquí es donde debes reordenar las columnas según TARGET_ORDER
+    final_df = final_df.reindex(columns=TARGET_ORDER)
+
     return final_df
 
 # =========================
 # UI
 # =========================
-st.title("🧹 Reordenamiento de CSV para las altas de hospitales")
-st.write("Sube tu **CSV**, lo normalizo y ordeno según tu regla. Descarga el resultado listo para usar.")
+st.title("🧹 Reordenamiento de CSV")
+st.subheader("Sube tu archivo CSV para reordenarlo y limpiarlo")
 
-with st.expander("Opciones de lectura"):
-    col1, col2, col3 = st.columns(3)
-    encoding = col1.selectbox("Codificación", ["utf-8", "latin1", "utf-16"], index=0)
-    sep_choice = col2.selectbox("Separador", ["auto", ",", ";", "\\t"], index=0)
-    decimal = col3.selectbox("Separador decimal", [".", ","], index=0)
+uploaded_file = st.file_uploader("Cargar archivo CSV", type=["csv"])
 
-uploaded = st.file_uploader("Sube tu archivo (.csv)", type=["csv"])
-
-if uploaded:
-    # Determinar separador y engine
-    if sep_choice == "auto":
-        sep_arg, engine = None, "python"
-    else:
-        sep_arg = "\t" if sep_choice == "\\t" else sep_choice
-        engine = "python" if sep_arg in [";", "\t"] else "c"
-
+if uploaded_file:
     try:
-        df_in = pd.read_csv(uploaded, encoding=encoding, sep=sep_arg, decimal=decimal, engine=engine)
-        st.success(f"Archivo leído correctamente. Filas: {len(df_in):,}  |  Columnas: {len(df_in.columns):,}")
-        with st.expander("Vista previa del CSV original (primeras 10 filas)", expanded=False):
-            st.dataframe(df_in.head(10), use_container_width=True)
+        df = pd.read_csv(uploaded_file)
 
-        # Procesar
-        df_out = ordenar_csv(df_in)
+        st.write(f"Archivo cargado con {len(df)} filas y {len(df.columns)} columnas.")
+        
+        # Llamar a la función que reordenará el CSV
+        df_processed = ordenar_csv(df)
 
-        st.subheader("Resultado (primeras 20 filas)")
-        st.dataframe(df_out.head(20), use_container_width=True)
+        # Mostrar un preview del archivo procesado
+        st.subheader("Vista previa del archivo procesado:")
+        st.write(df_processed.head())
 
-        # Descarga
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        out_name = f"pacientes_ordenado_14_columnas_{stamp}.csv"
-        buffer = io.StringIO()
-        df_out.to_csv(buffer, index=False, encoding="utf-8-sig")
+        # Botón de descarga
         st.download_button(
-            label="⬇️ Descargar CSV resultado",
-            data=buffer.getvalue().encode("utf-8-sig"),
-            file_name=out_name,
+            label="Descargar archivo procesado",
+            data=df_processed.to_csv(index=False).encode("utf-8"),
+            file_name="archivo_procesado.csv",
             mime="text/csv"
         )
-
-        # Log informativo
-        st.info(
-            "‘Nombre del responsable’ ← ‘Nombre Responsable’  \n"
-            "‘Fecha de egreso’ ← ‘Fecha egreso’ (DD/MM/YYYY)  \n"
-            "‘Nombre del paciente’ se construye si hay nombres/apellidos  \n"
-            "Diagnósticos: limpieza de códigos CIE-10"
-        )
-
     except Exception as e:
-        st.error("No pude leer o procesar el CSV. Revisa el separador, codificación o contenido.")
-        st.exception(e)
-else:
-    st.warning("Carga un archivo CSV para iniciar.")
+        st.error(f"Ocurrió un error: {e}")
