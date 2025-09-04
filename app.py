@@ -64,38 +64,41 @@ def ordenar_csv(df: pd.DataFrame) -> pd.DataFrame:
         "Médico que realiza seguimiento", "RESUMEN DE SEGUIMIENTO"
     ]
 
+    synonyms = {
+        "Edad": ["edad", "anos", "años"],
+        "Número de expediente": [
+            "numero de expediente", "n de expediente", "n expediente", "no expediente",
+            "expediente", "n expediente clinico", "nº expediente", "num expediente"
+        ],
+        "Número de contacto": [
+            "numero de contacto", "telefono", "teléfono", "celular", "whatsapp",
+            "contacto", "telefono responsable", "tel responsable", "tel paciente", "telefono paciente"
+        ],
+        "Servicio": ["servicio", "area", "área", "departamento", "unidad", "servicio hospitalario"],
+        "Fecha de ingreso": [
+            "fecha de ingreso", "ingreso", "fecha ingreso", "f ingreso", "fecha de admision", "admision", "admisión"
+        ],
+        "Diagnóstico de ingreso": [
+            "diagnostico de ingreso", "dx ingreso", "diagnostico ingreso", "diagnóstico de ingreso"
+        ],
+        "Diagnóstico de egreso": [
+            "diagnostico de egreso", "dx egreso", "diagnostico egreso", "diagnóstico de egreso"
+        ],
+        "Llamada de seguimiento": [
+            "llamada de seguimiento", "seguimiento", "llamada", "contacto seguimiento", "follow up"
+        ],
+        "Médico que realiza seguimiento": [
+            "medico que realiza seguimiento", "médico que realiza seguimiento",
+            "medico seguimiento", "médico seguimiento", "medico responsable", "doctor seguimiento",
+            "quien realiza seguimiento"
+        ],
+        "RESUMEN DE SEGUIMIENTO": [
+            "resumen de seguimiento", "nota de seguimiento", "observaciones", "comentarios",
+            "plan", "resumen"
+        ],
+    }
+
     norm_cols = {normalize(c): c for c in df.columns}
-
-    # Mostrar las columnas disponibles para depuración
-    st.write("Columnas disponibles en el archivo CSV:")
-    st.write(list(df.columns))
-
-    # Normalización y ajuste de las columnas
-    def find_source_col(target_name):
-        if target_name not in synonyms:
-            return None
-        syns = [normalize(s) for s in synonyms[target_name]]
-
-        # 1) Igualdad exacta normalizada
-        for syn in syns:
-            if syn in norm_cols:
-                return norm_cols[syn]
-        # 2) Inclusión (laxto)
-        for syn in syns:
-            for nc, orig in norm_cols.items():
-                if syn and (syn in nc or nc in syn):
-                    return orig
-        # 3) Intersección de tokens
-        best, score = None, 0
-        for nc, orig in norm_cols.items():
-            for syn in syns:
-                toks_syn = set(syn.split())
-                toks_nc = set(nc.split())
-                inter = len(toks_syn & toks_nc)
-                if inter > score:
-                    score = inter
-                    best = orig
-        return best
 
     # Asignación de contacto de paciente y responsable
     if "Teléfono Paciente" in df.columns:
@@ -108,19 +111,43 @@ def ordenar_csv(df: pd.DataFrame) -> pd.DataFrame:
     else:
         contacto_responsable_series = ""
 
-    # Creación del DataFrame final con las columnas ordenadas
+    # Construcción final
     final_df = pd.DataFrame()
-    for tgt in TARGET_ORDER:
+    for tgt in [
+        "Nombre del paciente", "Edad", "Número de expediente", "Número de contacto", "Nombre del responsable",
+        "Contacto de responsable", "Servicio", "Fecha de ingreso", "Diagnóstico de ingreso",
+        "Fecha de egreso", "Diagnóstico de egreso", "Llamada de seguimiento",
+        "Médico que realiza seguimiento", "RESUMEN DE SEGUIMIENTO"
+    ]:
         if tgt == "Nombre del paciente":
             final_df[tgt] = df["Nombre del paciente"]; continue
+        if tgt == "Nombre del responsable":
+            final_df[tgt] = nombre_responsable_series if isinstance(nombre_responsable_series, pd.Series) else ""; continue
+        if tgt == "Fecha de egreso":
+            final_df[tgt] = fecha_egreso_series if isinstance(fecha_egreso_series, pd.Series) else ""; continue
         if tgt == "Número de contacto":
-            final_df[tgt] = numero_contacto_series; continue
+            final_df[tgt] = numero_contacto_series if isinstance(numero_contacto_series, pd.Series) else ""; continue
         if tgt == "Contacto de responsable":
-            final_df[tgt] = contacto_responsable_series; continue
-        # Continuar asignando valores a las demás columnas de manera similar...
-    
-    # Reorganización final
+            final_df[tgt] = contacto_responsable_series if isinstance(contacto_responsable_series, pd.Series) else ""; continue
+
+        src = find_source_col(tgt)
+        if src and src in df.columns:
+            if tgt == "Fecha de ingreso":
+                final_df[tgt] = as_date(df[src])
+            elif tgt in ["Diagnóstico de ingreso", "Diagnóstico de egreso"]:
+                final_df[tgt] = df[src].apply(clean_diagnosis)
+            else:
+                final_df[tgt] = df[src]
+        else:
+            if tgt in ["Diagnóstico de ingreso", "Diagnóstico de egreso"]:
+                guesses = [c for c in df.columns if "diagnost" in normalize(c)]
+                final_df[tgt] = df[guesses[0]].apply(clean_diagnosis) if guesses else ""
+            else:
+                final_df[tgt] = ""
+
+    # Aquí es donde debes reordenar las columnas según TARGET_ORDER
     final_df = final_df.reindex(columns=TARGET_ORDER)
+
     return final_df
 
 # =========================
