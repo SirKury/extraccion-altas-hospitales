@@ -133,7 +133,7 @@ def ordenar_csv(df: pd.DataFrame) -> pd.DataFrame:
         nc = normalize(col)
         if any(tok in nc for tok in ["nombre", "nombres", "apellido", "apellidos", "paciente"]):
             if not any(ex in nc for ex in EXCLUDE_TOKENS):
-                name_candidates.append(col))
+                name_candidates.append(col)
 
     priority = [
         "primer nombre", "segundo nombre", "1er nombre", "2do nombre", "nombres", "nombre",
