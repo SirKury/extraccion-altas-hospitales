@@ -58,19 +58,10 @@ def clean_diagnosis(text: str) -> str:
 # =========================
 def ordenar_csv(df: pd.DataFrame) -> pd.DataFrame:
     TARGET_ORDER = [
-        "Nombre del paciente",
-        "Edad",
-        "Nombre del responsable",
-        "Número de expediente",
-        "Número de contacto",
-        "Servicio",
-        "Fecha de ingreso",
-        "Diagnóstico de ingreso",
-        "Fecha de egreso",
-        "Diagnóstico de egreso",
-        "Llamada de seguimiento",
-        "Médico que realiza seguimiento",
-        "RESUMEN DE SEGUIMIENTO",
+        "Nombre del paciente","Edad","Número de expediente","Número de contacto","Nombre del responsable",
+        "Contacto de responsable","Servicio","Fecha de ingreso","Diagnóstico de ingreso",
+        "Fecha de egreso","Diagnóstico de egreso","Llamada de seguimiento",
+        "Médico que realiza seguimiento","RESUMEN DE SEGUIMIENTO"
     ]
 
     synonyms = {
@@ -142,7 +133,7 @@ def ordenar_csv(df: pd.DataFrame) -> pd.DataFrame:
         nc = normalize(col)
         if any(tok in nc for tok in ["nombre", "nombres", "apellido", "apellidos", "paciente"]):
             if not any(ex in nc for ex in EXCLUDE_TOKENS):
-                name_candidates.append(col)
+                name_candidates.append(col))
 
     priority = [
         "primer nombre", "segundo nombre", "1er nombre", "2do nombre", "nombres", "nombre",
@@ -190,12 +181,19 @@ def ordenar_csv(df: pd.DataFrame) -> pd.DataFrame:
     else:
         numero_contacto_series = ""
 
+    # Extraer contacto del responsable como columna separada
+    if resp_cols:
+        contacto_responsable_series = df[resp_cols[0]]
+    else:
+        contacto_responsable_series = ""
+
     # Construcción final
     final_df = pd.DataFrame()
     for tgt in [
-        "Nombre del paciente","Edad","Nombre del responsable","Número de expediente","Número de contacto",
-        "Servicio","Fecha de ingreso","Diagnóstico de ingreso","Fecha de egreso","Diagnóstico de egreso",
-        "Llamada de seguimiento","Médico que realiza seguimiento","RESUMEN DE SEGUIMIENTO"
+        "Nombre del paciente","Edad","Número de expediente","Número de contacto","Nombre del responsable",
+        "Contacto de responsable","Servicio","Fecha de ingreso","Diagnóstico de ingreso",
+        "Fecha de egreso","Diagnóstico de egreso","Llamada de seguimiento",
+        "Médico que realiza seguimiento","RESUMEN DE SEGUIMIENTO"
     ]:
         if tgt == "Nombre del paciente":
             final_df[tgt] = df["Nombre del paciente"]; continue
@@ -205,6 +203,8 @@ def ordenar_csv(df: pd.DataFrame) -> pd.DataFrame:
             final_df[tgt] = fecha_egreso_series if isinstance(fecha_egreso_series, pd.Series) else ""; continue
         if tgt == "Número de contacto":
             final_df[tgt] = numero_contacto_series if isinstance(numero_contacto_series, pd.Series) else ""; continue
+        if tgt == "Contacto de responsable":
+            final_df[tgt] = contacto_responsable_series if isinstance(contacto_responsable_series, pd.Series) else ""; continue
 
         src = find_source_col(tgt)
         if src and src in df.columns:
@@ -259,7 +259,7 @@ if uploaded:
 
         # Descarga
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        out_name = f"pacientes_ordenado_13_columnas_{stamp}.csv"
+        out_name = f"pacientes_ordenado_14_columnas_{stamp}.csv"
         buffer = io.StringIO()
         df_out.to_csv(buffer, index=False, encoding="utf-8-sig")
         st.download_button(
